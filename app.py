@@ -1,48 +1,34 @@
-from flask import Flask, request, jsonify
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
 import pickle
-import os
-from Constant.constants import MODEL_DIR,MODEL_NAME
-
-
-PATH = os.path.join(MODEL_DIR,MODEL_NAME)
-
-
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
-#Load the trained model 
-with open(PATH, 'rb') as file:
-    model = pickle.load(file)
-print("Model Loded succesfully")
+# Load the saved pipeline and model
+with open('./saved_models/pipeline_model.pkl', 'rb') as file:
+    pipeline = pickle.load(file)
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    # Get the input data from the POST request
-    data = request.form
+    # Retrieve the JSON data from the POST request
+    input_data = request.get_json()
 
-    # Preprocess the input data
-    age = int(data['age'])
-    sex = int(data['sex'])
-    cigsPerDay = int(data['cigsPerDay'])
-    totChol = int(data['totChol'])
-    sysBP = int(data['sysBP'])
-    glucose = int(data['glucose'])
+    # Convert string values to appropriate data types
+    input_data = {k: float(v) if not isinstance(v, float) else v for k, v in input_data.items()}
 
-    # Make a prediction using the loaded model
-    prediction = model.predict([[age, sex, cigsPerDay, totChol, sysBP, glucose]])
+    # Create a DataFrame from the input_data dictionary
+    df = pd.DataFrame.from_dict([input_data])
 
-    # Return the prediction as an API response
-    response = {
-        'prediction': prediction[0]
-    }
+    # Perform inference using the loaded pipeline
+    predictions = pipeline.predict(df.values)
 
+    # Return the predictions as a JSON response
+    response = {'predictions': predictions.tolist()}  # Convert predictions to a list
+    print(response, type(response))
     return jsonify(response)
-
-@app.route('/')
-def hello():
-    # Get the input data from the POST request
-    str1  = "Hello world"
-    return jsonify(str1)
 
 if __name__ == '__main__':
     app.run()
